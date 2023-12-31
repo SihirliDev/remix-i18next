@@ -57,13 +57,14 @@ export interface LanguageDetectorOption {
   /**
    * The order the library will use to detect the user preferred language.
    * By default the order is
+   * - path
    * - searchParams
    * - cookie
    * - session
    * - header
    * And finally the fallback language.
    */
-  order?: Array<"searchParams" | "cookie" | "session" | "header">;
+  order?: Array<"path" | "searchParams" | "cookie" | "session" | "header">;
 }
 
 export interface RemixI18NextOption {
@@ -96,6 +97,7 @@ export class RemixI18Next {
    * Detect the current locale by following the order defined in the
    * `detection.order` option.
    * By default the order is
+   * - path
    * - searchParams
    * - cookie
    * - session
@@ -230,6 +232,7 @@ class LanguageDetector {
 
   public async detect(request: Request): Promise<string> {
     let order = this.options.order ?? [
+      "path",
       "searchParams",
       "cookie",
       "session",
@@ -238,6 +241,10 @@ class LanguageDetector {
 
     for (let method of order) {
       let locale: string | null = null;
+
+      if (method === "path") {
+        locale = await this.fromPath(request);
+      }      
 
       if (method === "searchParams") {
         locale = await this.fromSearchParams(request);
@@ -259,6 +266,22 @@ class LanguageDetector {
     }
 
     return this.options.fallbackLanguage;
+  }
+
+  private async fromPath(request: Request): Promise<string | null> {
+    let url = new URL(request.url);
+    let parts = url.pathname.split('/');
+    let localeInPath = parts[1];
+    
+    if (localeInPath === null  || localeInPath === "")
+        return null;
+
+    if (this.options.supportedLanguages.includes(localeInPath))
+    {
+        return this.fromSupported(localeInPath)
+    }
+    
+    return null;
   }
 
   private async fromSearchParams(request: Request): Promise<string | null> {
